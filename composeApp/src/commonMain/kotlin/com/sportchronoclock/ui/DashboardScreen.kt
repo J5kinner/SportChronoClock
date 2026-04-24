@@ -55,7 +55,7 @@ fun DashboardScreen(
     val demoScope = rememberCoroutineScope()
     var demoSpeed by remember { mutableStateOf(0f) }
     var isDemoActive by remember { mutableStateOf(false) }
-    var demoRampJob by remember { mutableStateOf<Job?>(null) }
+    val demoRampJob = remember { arrayOfNulls<Job>(1) }
     var autoSweepDone by remember { mutableStateOf(false) }
     val sweepAnimatable = remember { Animatable(0f) }
 
@@ -96,10 +96,12 @@ fun DashboardScreen(
             val isLandscape = maxWidth > maxHeight
 
             val onDemoPress: () -> Unit = {
-                demoRampJob?.cancel()
+                demoRampJob[0]?.cancel()
                 isDemoActive = true
                 demoSpeed = 0f
-                demoRampJob = demoScope.launch {
+                // demoSpeed is snapshot state; mutations from a Main-thread coroutine are coherent —
+                // each delay(16) yields to the frame loop, which snapshots and reads the latest value.
+                demoRampJob[0] = demoScope.launch {
                     while (demoSpeed < 200f) {
                         demoSpeed = (demoSpeed + 0.5f).coerceAtMost(200f)
                         delay(16)
@@ -107,9 +109,10 @@ fun DashboardScreen(
                 }
             }
             val onDemoRelease: () -> Unit = {
-                demoRampJob?.cancel()
+                demoRampJob[0]?.cancel()
+                // isDemoActive = false before wind-down launch; displaySpeed stays active via demoSpeed > 0f
                 isDemoActive = false
-                demoRampJob = demoScope.launch {
+                demoRampJob[0] = demoScope.launch {
                     while (demoSpeed > 0f) {
                         demoSpeed = (demoSpeed - 0.5f).coerceAtLeast(0f)
                         delay(16)
@@ -364,7 +367,7 @@ private fun RouteSummaryBar(
             )
             Text(
                 text = routeResult.destinationName.take(50),
-                color = Color(0xFF445566),
+                color = Color(0xFF8899AA),
                 fontSize = 10.sp,
                 maxLines = 1
             )
