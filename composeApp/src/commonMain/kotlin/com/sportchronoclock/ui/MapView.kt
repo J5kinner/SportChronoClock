@@ -8,5 +8,6 @@ expect fun MapView(
     latitude: Double,
     longitude: Double,
     bearing: Float,
+    routePoints: List<Pair<Double, Double>> = emptyList(),
     modifier: Modifier = Modifier
 )

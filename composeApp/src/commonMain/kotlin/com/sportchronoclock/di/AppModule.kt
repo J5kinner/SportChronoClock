@@ -1,11 +1,11 @@
 package com.sportchronoclock.di
 
+import com.sportchronoclock.navigation.DirectionsService
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
-// ViewModel is created directly in DashboardScreen via lifecycle's viewModel { }
-// to avoid a binary incompatibility between koin-compose-viewmodel and
-// lifecycle-viewmodel-compose 2.10.x
-val commonModule = module {}
+val commonModule = module {
+    single { DirectionsService(get()) }
+}
 
 expect val platformModule: Module
