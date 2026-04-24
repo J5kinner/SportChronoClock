@@ -8,6 +8,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.maplibre.android.MapLibre
+import org.maplibre.android.annotations.Marker
+import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -28,23 +30,37 @@ actual fun MapView(
     longitude: Double,
     bearing: Float,
     routePoints: List<Pair<Double, Double>>,
+    pinLocation: Pair<Double, Double>?,
+    onLongPress: (lat: Double, lng: Double) -> Unit,
+    onDirectionsRequested: () -> Unit,
     modifier: Modifier
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val currentOnLongPress = rememberUpdatedState(onLongPress)
+    val currentOnDirectionsRequested = rememberUpdatedState(onDirectionsRequested)
+    val pinMarker = remember { mutableStateOf<Marker?>(null) }
 
     val mapView = remember {
         MapLibre.getInstance(context)
         MapView(context).apply { onCreate(null) }
     }
 
-    // Load style once
+    // Load style + register listeners once
     LaunchedEffect(Unit) {
         mapView.getMapAsync { map ->
             map.setStyle(Style.Builder().fromUri(STYLE_URL))
             map.uiSettings.apply {
                 isRotateGesturesEnabled = false
                 isCompassEnabled = false
+            }
+            map.addOnMapLongClickListener { latLng ->
+                currentOnLongPress.value(latLng.latitude, latLng.longitude)
+                true
+            }
+            map.setOnInfoWindowClickListener { _ ->
+                currentOnDirectionsRequested.value()
+                true
             }
         }
     }
@@ -67,7 +83,6 @@ actual fun MapView(
             map.getStyle { style ->
                 style.removeLayer(ROUTE_LAYER)
                 style.removeSource(ROUTE_SOURCE)
-
                 if (routePoints.isNotEmpty()) {
                     val coords = routePoints.joinToString(",") { (lat, lon) -> "[$lon,$lat]" }
                     val geoJson = """{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"LineString","coordinates":[$coords]},"properties":{}}]}"""
@@ -81,6 +96,22 @@ actual fun MapView(
                         )
                     )
                 }
+            }
+        }
+    }
+
+    // Add or remove the pin marker; tapping its info-window fires onDirectionsRequested
+    LaunchedEffect(pinLocation) {
+        mapView.getMapAsync { map ->
+            pinMarker.value?.let { map.removeMarker(it) }
+            pinMarker.value = null
+            if (pinLocation != null) {
+                val (lat, lng) = pinLocation
+                pinMarker.value = map.addMarker(
+                    MarkerOptions()
+                        .position(LatLng(lat, lng))
+                        .title("Get Directions")
+                )
             }
         }
     }
