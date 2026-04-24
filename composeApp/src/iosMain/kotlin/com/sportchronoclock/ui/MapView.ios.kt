@@ -44,10 +44,10 @@ private class MapDelegate(
         ).apply {
             canShowCallout = true
             pinTintColor = UIColor.redColor
-            rightCalloutAccessoryView = (UIButton.buttonWithType(UIButtonTypeSystem) as UIButton).apply {
-                    setTitle("Get Directions", forState = UIControlStateNormal)
-                    sizeToFit()
-                }
+            rightCalloutAccessoryView = (UIButton.buttonWithType(UIButtonTypeSystem) as UIButton).also {
+                it.setTitle("Get Directions", forState = UIControlStateNormal)
+                it.sizeToFit()
+            }
         }
     }
 
@@ -89,6 +89,8 @@ actual fun MapView(
         modifier = modifier,
         factory = {
             MKMapView().also { map ->
+                delegate.onLongPress = { lat, lng -> currentOnLongPress.value(lat, lng) }
+                delegate.onDirectionsRequested = { currentOnDirectionsRequested.value() }
                 map.delegate = delegate
                 map.showsUserLocation = true
                 map.pitchEnabled = false
@@ -101,9 +103,6 @@ actual fun MapView(
             }
         },
         update = { map ->
-            // Keep delegate callbacks current without re-running factory
-            delegate.onLongPress = { lat, lng -> currentOnLongPress.value(lat, lng) }
-            delegate.onDirectionsRequested = { currentOnDirectionsRequested.value() }
 
             // Camera
             val coordinate = CLLocationCoordinate2DMake(latitude, longitude)
