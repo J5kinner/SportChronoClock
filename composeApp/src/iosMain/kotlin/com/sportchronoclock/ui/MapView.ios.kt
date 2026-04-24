@@ -44,7 +44,10 @@ private class MapDelegate(
         ).apply {
             canShowCallout = true
             pinTintColor = UIColor.redColor
-            rightCalloutAccessoryView = UIButton.buttonWithType(UIButtonTypeDetailDisclosure)
+            rightCalloutAccessoryView = (UIButton.buttonWithType(UIButtonTypeSystem) as UIButton).apply {
+                    setTitle("Get Directions", forState = UIControlStateNormal)
+                    sizeToFit()
+                }
         }
     }
 
