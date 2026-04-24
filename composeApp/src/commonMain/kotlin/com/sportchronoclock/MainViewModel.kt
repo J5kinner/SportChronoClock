@@ -28,7 +28,9 @@ class MainViewModel(
     private val _searchState = MutableStateFlow<SearchState>(SearchState.Idle)
     val searchState: StateFlow<SearchState> = _searchState.asStateFlow()
 
-    // Low-pass filter: higher alpha = more responsive, lower = smoother
+    private val _pinLocation = MutableStateFlow<Pair<Double, Double>?>(null)
+    val pinLocation: StateFlow<Pair<Double, Double>?> = _pinLocation.asStateFlow()
+
     private val alpha = 0.15f
     private var filteredSpeed = 0f
 
@@ -65,8 +67,33 @@ class MainViewModel(
         }
     }
 
+    fun setPinLocation(lat: Double, lng: Double) {
+        _pinLocation.value = lat to lng
+        _routeResult.value = null
+        _searchState.value = SearchState.Idle
+    }
+
+    fun routeToPin(toLat: Double, toLng: Double) {
+        val location = _locationData.value ?: run {
+            _searchState.value = SearchState.Error("Waiting for GPS fix — try again in a moment")
+            return
+        }
+        viewModelScope.launch {
+            _searchState.value = SearchState.Loading
+            directionsService.routeToCoordinates(location.latitude, location.longitude, toLat, toLng)
+                .onSuccess { result ->
+                    _routeResult.value = result
+                    _searchState.value = SearchState.Idle
+                }
+                .onFailure { e ->
+                    _searchState.value = SearchState.Error(e.message ?: "Could not find route")
+                }
+        }
+    }
+
     fun clearRoute() {
         _routeResult.value = null
+        _pinLocation.value = null
         _searchState.value = SearchState.Idle
     }
 

@@ -17,6 +17,17 @@ class DirectionsService(private val httpClient: HttpClient) {
         route
     }
 
+    suspend fun routeToCoordinates(
+        fromLat: Double,
+        fromLon: Double,
+        toLat: Double,
+        toLon: Double
+    ): Result<RouteResult> = runCatching {
+        val destinationName = "%.5f, %.5f".format(toLat, toLon)
+        getRoute(fromLat, fromLon, toLat, toLon, destinationName)
+            ?: error("Could not calculate a route")
+    }
+
     private suspend fun geocode(query: String): Triple<Double, Double, String>? {
         val results = httpClient.get("https://nominatim.openstreetmap.org/search") {
             parameter("q", query)
