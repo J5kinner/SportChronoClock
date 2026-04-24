@@ -31,6 +31,7 @@ class MainViewModel(
     private val _pinLocation = MutableStateFlow<Pair<Double, Double>?>(null)
     val pinLocation: StateFlow<Pair<Double, Double>?> = _pinLocation.asStateFlow()
 
+    // Low-pass filter: higher alpha = more responsive, lower = smoother
     private val alpha = 0.15f
     private var filteredSpeed = 0f
 
