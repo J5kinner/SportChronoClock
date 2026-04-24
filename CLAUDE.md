@@ -89,5 +89,11 @@ Key additions beyond the Compose Multiplatform boilerplate (see `gradle/libs.ver
 |---|---|
 | Koin (core, android, compose, compose-viewmodel) | `koin` |
 | Google Play Services Location | `playServicesLocation` |
-| Google Maps Compose | `mapsCompose` |
+| MapLibre Android SDK | `maplibre` |
 | kotlinx-coroutines | `coroutines` |
+
+## Layout
+
+`DashboardScreen` uses `BoxWithConstraints` to detect orientation. Portrait: `Column` (speedometer top 40%, map bottom 60%). Landscape: `Row` (speedometer left 40%, map right 60%). The layout is shared across both platforms — no expect/actual needed.
+
+The Android map uses MapLibre (`org.maplibre.gl:android-sdk`) via `AndroidView` with OpenFreeMap tiles (no API key). iOS uses `MKMapView` via `UIKitView` (MapKit, no API key).

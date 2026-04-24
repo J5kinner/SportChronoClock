@@ -1,12 +1,11 @@
 package com.sportchronoclock.di
 
-import com.sportchronoclock.MainViewModel
 import org.koin.core.module.Module
-import org.koin.compose.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 
-val commonModule = module {
-    viewModel { MainViewModel(get()) }
-}
+// ViewModel is created directly in DashboardScreen via lifecycle's viewModel { }
+// to avoid a binary incompatibility between koin-compose-viewmodel and
+// lifecycle-viewmodel-compose 2.10.x
+val commonModule = module {}
 
 expect val platformModule: Module

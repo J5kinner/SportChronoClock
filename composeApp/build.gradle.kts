@@ -31,7 +31,7 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             implementation(libs.koin.android)
             implementation(libs.play.services.location)
-            implementation(libs.maps.compose)
+            implementation(libs.maplibre.android)
             implementation(libs.kotlinx.coroutines.android)
         }
         commonMain.dependencies {
@@ -45,7 +45,6 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
-            implementation(libs.koin.compose.viewmodel)
             implementation(libs.kotlinx.coroutines.core)
         }
         commonTest.dependencies {

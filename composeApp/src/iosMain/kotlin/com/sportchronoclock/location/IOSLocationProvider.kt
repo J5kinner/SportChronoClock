@@ -1,9 +1,13 @@
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package com.sportchronoclock.location
 
+import kotlinx.cinterop.useContents
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import platform.CoreLocation.*
+import platform.Foundation.timeIntervalSince1970
 import platform.darwin.NSObject
 
 private class LocationDelegate(
@@ -24,8 +28,11 @@ private class LocationDelegate(
         )
     }
 
-    override fun locationManager(manager: CLLocationManager, didFailWithError: platform.Foundation.NSError) {
-        // Silently swallow errors; flow simply won't emit
+    override fun locationManager(
+        manager: CLLocationManager,
+        didFailWithError: platform.Foundation.NSError
+    ) {
+        // Silently ignore; flow simply won't emit
     }
 }
 
@@ -43,11 +50,7 @@ class IOSLocationProvider : LocationProvider {
         it.allowsBackgroundLocationUpdates = true
     }
 
-    override fun startTracking() {
-        locationManager.startUpdatingLocation()
-    }
+    override fun startTracking() = locationManager.startUpdatingLocation()
 
-    override fun stopTracking() {
-        locationManager.stopUpdatingLocation()
-    }
+    override fun stopTracking() = locationManager.stopUpdatingLocation()
 }

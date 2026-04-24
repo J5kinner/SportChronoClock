@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package com.sportchronoclock.ui
 
 import androidx.compose.runtime.Composable
