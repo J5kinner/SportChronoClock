@@ -9,5 +9,8 @@ expect fun MapView(
     longitude: Double,
     bearing: Float,
     routePoints: List<Pair<Double, Double>> = emptyList(),
+    pinLocation: Pair<Double, Double>? = null,
+    onLongPress: (lat: Double, lng: Double) -> Unit = {},
+    onDirectionsRequested: () -> Unit = {},
     modifier: Modifier = Modifier
 )
