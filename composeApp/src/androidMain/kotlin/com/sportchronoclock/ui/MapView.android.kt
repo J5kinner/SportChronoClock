@@ -8,7 +8,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.maplibre.android.MapLibre
-import org.maplibre.android.annotations.Marker
 import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -39,7 +38,7 @@ actual fun MapView(
     val lifecycleOwner = LocalLifecycleOwner.current
     val currentOnLongPress = rememberUpdatedState(onLongPress)
     val currentOnDirectionsRequested = rememberUpdatedState(onDirectionsRequested)
-    val pinMarker = remember { mutableStateOf<Marker?>(null) }
+    val pinMarkerRef = remember { arrayOfNulls<org.maplibre.android.annotations.Marker>(1) }
 
     val mapView = remember {
         MapLibre.getInstance(context)
@@ -103,11 +102,11 @@ actual fun MapView(
     // Add or remove the pin marker; tapping its info-window fires onDirectionsRequested
     LaunchedEffect(pinLocation) {
         mapView.getMapAsync { map ->
-            pinMarker.value?.let { map.removeMarker(it) }
-            pinMarker.value = null
+            pinMarkerRef[0]?.let { map.removeMarker(it) }
+            pinMarkerRef[0] = null
             if (pinLocation != null) {
                 val (lat, lng) = pinLocation
-                pinMarker.value = map.addMarker(
+                pinMarkerRef[0] = map.addMarker(
                     MarkerOptions()
                         .position(LatLng(lat, lng))
                         .title("Get Directions")
