@@ -130,9 +130,10 @@ actual fun MapView(
             }
 
             // Pin annotation — remove any existing, add new one if set
-            map.annotations.filterIsInstance<MKPointAnnotation>().forEach {
-                map.removeAnnotation(it)
-            }
+            map.annotations
+                .filterIsInstance<MKPointAnnotation>()
+                .filter { it !is MKUserLocation }
+                .forEach { map.removeAnnotation(it) }
             if (pinLocation != null) {
                 val (lat, lng) = pinLocation
                 val annotation = MKPointAnnotation()
