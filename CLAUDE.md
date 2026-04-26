@@ -1,10 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Project Overview
-
-SportChronoClock is a **Kotlin Multiplatform (KMP)** app with a **Compose Multiplatform** shared UI targeting Android and iOS. It is a sports clock / speedometer app that tracks location, displays speed, and shows a map.
+ZacsSportChronoClock is a Kotlin Multiplatform (KMP) + Compose Multiplatform sports clock/speedometer app targeting Android and iOS.
 
 ## Build Commands
 
@@ -25,11 +21,9 @@ SportChronoClock is a **Kotlin Multiplatform (KMP)** app with a **Compose Multip
 ./gradlew --refresh-dependencies
 ```
 
-**iOS**: Open `iosApp/iosApp.xcodeproj` in Xcode and run from there. Xcode must build the shared KMP framework first via a Gradle run script build phase.
+**iOS**: Open `iosApp/iosApp.xcodeproj` in Xcode and run from there.
 
-## Architecture
-
-### Source Set Layout
+## Source Set Layout
 
 ```
 composeApp/src/
@@ -39,51 +33,37 @@ composeApp/src/
 └── commonTest/    — Shared tests
 ```
 
-All shared business logic lives in `commonMain`. Platform source sets contain `actual` implementations for `expect` declarations defined in `commonMain`.
+## Key Packages
 
-### Key Packages
-
-- `com.sportchronoclock.location` — `LocationData` data class, `LocationProvider` interface, and platform `actual` implementations
-- `com.sportchronoclock.permissions` — `expect class PermissionHandler` for checking location permission status
+- `com.sportchronoclock.location` — `LocationData` data class, `LocationProvider` interface, platform actuals
+- `com.sportchronoclock.permissions` — `expect class PermissionHandler`
 - `com.sportchronoclock.di` — Koin modules (`commonModule`, `expect val platformModule`)
-- `com.sportchronoclock.ui` — All Compose UI: `DashboardScreen`, `SpeedometerGauge`, `expect fun MapView`, `expect fun KeepScreenOn`, `expect fun RequestLocationPermission`
-- `com.sportchronoclock.MainViewModel` — Collects from `LocationProvider`, applies m/s → km/h conversion and a low-pass filter, exposes `StateFlow<Float>` for speed
+- `com.sportchronoclock.ui` — `DashboardScreen`, `SpeedometerGauge`, `expect fun MapView`, `expect fun KeepScreenOn`, `expect fun RequestLocationPermission`
+- `com.sportchronoclock.MainViewModel` — m/s → km/h conversion, low-pass filter, `StateFlow<Float>` for speed
 
-### Dependency Injection
-
-Koin is used for DI. `commonModule` (in `di/AppModule.kt`) declares the `MainViewModel`. Each platform defines `actual val platformModule` in its `di/` package, providing `LocationProvider` and `PermissionHandler`.
-
-- Android: Koin started in `SportChronoApplication.onCreate()` with `androidContext(this)`
-- iOS: Koin started in `MainViewController.kt` inside a `remember` block
-
-### Expect/Actual Declarations
-
-All `expect` declarations are in `commonMain`; their `actual` counterparts mirror the package path in `androidMain`/`iosMain`:
+## Expect/Actual Declarations
 
 | commonMain `expect` | Android `actual` | iOS `actual` |
 |---|---|---|
 | `PermissionHandler` (class) | Uses `ContextCompat` | Uses `CLLocationManager` |
-| `MapView` (composable) | Google Maps Compose | MapKit via `UIKitView` |
+| `MapView` (composable) | MapLibre via `AndroidView` | MapKit via `UIKitView` |
 | `KeepScreenOn` (composable) | `view.keepScreenOn = true` | `idleTimerDisabled = true` |
 | `RequestLocationPermission` (composable) | `ActivityResultContracts` | `CLLocationManager` delegate |
 | `platformModule` (val) | Koin `module { }` with Android deps | Koin `module { }` with iOS deps |
 
-### Platform-Specific Notes
+## Platform-Specific Constraints
 
 **Android**
-- Location is tracked via `FusedLocationProviderClient` inside `LocationForegroundService` (foreground service keeps tracking alive when the app is backgrounded)
-- `AndroidLocationProvider` starts/stops the service and exposes the service's `SharedFlow`
+- Background location uses `LocationForegroundService` (foreground service) with `FusedLocationProviderClient`
 - `SportChronoApplication` must be declared in `AndroidManifest.xml` as `android:name`
-- Google Maps requires an API key in `AndroidManifest.xml` meta-data (`com.google.android.geo.API_KEY`); add your key to `local.properties` as `MAPS_API_KEY=...` and wire it via `manifestPlaceholders`
 
 **iOS**
-- Location is tracked via `CLLocationManager` with `kCLLocationAccuracyBestForNavigation`; the delegate is implemented as an `NSObject` subclass in Kotlin/Native
-- `Info.plist` must contain `NSLocationAlwaysAndWhenInUseUsageDescription` and `NSLocationWhenInUseUsageDescription` keys
-- The map uses `MKMapView` wrapped in a Compose `UIKitView`
+- `CLLocationManager` accuracy is `kCLLocationAccuracyBestForNavigation`; delegate is an `NSObject` subclass in Kotlin/Native
+- `Info.plist` must contain `NSLocationAlwaysAndWhenInUseUsageDescription` and `NSLocationWhenInUseUsageDescription`
 
 ## Dependency Versions
 
-Key additions beyond the Compose Multiplatform boilerplate (see `gradle/libs.versions.toml`):
+See `gradle/libs.versions.toml` for version pins.
 
 | Dependency | Version key |
 |---|---|
@@ -91,9 +71,3 @@ Key additions beyond the Compose Multiplatform boilerplate (see `gradle/libs.ver
 | Google Play Services Location | `playServicesLocation` |
 | MapLibre Android SDK | `maplibre` |
 | kotlinx-coroutines | `coroutines` |
-
-## Layout
-
-`DashboardScreen` uses `BoxWithConstraints` to detect orientation. Portrait: `Column` (speedometer top 40%, map bottom 60%). Landscape: `Row` (speedometer left 40%, map right 60%). The layout is shared across both platforms — no expect/actual needed.
-
-The Android map uses MapLibre (`org.maplibre.gl:android-sdk`) via `AndroidView` with OpenFreeMap tiles (no API key). iOS uses `MKMapView` via `UIKitView` (MapKit, no API key).
