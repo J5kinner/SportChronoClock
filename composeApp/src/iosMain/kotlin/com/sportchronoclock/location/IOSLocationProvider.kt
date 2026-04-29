@@ -17,13 +17,16 @@ private class LocationDelegate(
     override fun locationManager(manager: CLLocationManager, didUpdateLocations: List<*>) {
         val location = didUpdateLocations.lastOrNull() as? CLLocation ?: return
         val (lat, lon) = location.coordinate.useContents { latitude to longitude }
+        // CLLocation.speed is -1 when the platform has no speed measurement
+        val speedValid = location.speed >= 0.0
         onLocation(
             LocationData(
                 latitude = lat,
                 longitude = lon,
-                speed = maxOf(0f, location.speed.toFloat()),
+                speed = if (speedValid) location.speed.toFloat() else 0f,
                 bearing = maxOf(0f, location.course.toFloat()),
-                timestamp = (location.timestamp.timeIntervalSince1970 * 1000).toLong()
+                timestamp = (location.timestamp.timeIntervalSince1970 * 1000).toLong(),
+                hasSpeed = speedValid
             )
         )
     }
@@ -45,6 +48,7 @@ class IOSLocationProvider : LocationProvider {
     private val locationManager = CLLocationManager().also {
         it.delegate = delegate
         it.desiredAccuracy = kCLLocationAccuracyBestForNavigation
+        it.activityType = CLActivityTypeAutomotiveNavigation
         it.distanceFilter = kCLDistanceFilterNone
         it.pausesLocationUpdatesAutomatically = false
         it.allowsBackgroundLocationUpdates = true

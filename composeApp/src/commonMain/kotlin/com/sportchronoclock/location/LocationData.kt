@@ -5,5 +5,6 @@ data class LocationData(
     val longitude: Double,
     val speed: Float,    // m/s; negative means unavailable
     val bearing: Float,  // degrees 0–360; negative means unavailable
-    val timestamp: Long  // milliseconds since epoch
+    val timestamp: Long, // milliseconds since epoch
+    val hasSpeed: Boolean = false
 )
