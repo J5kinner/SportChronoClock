@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import kotlin.math.round
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -53,6 +54,7 @@ fun DashboardScreen(
     val pinLocation by viewModel.pinLocation.collectAsState()
     val suggestions by viewModel.suggestions.collectAsState()
     val currentStep by viewModel.currentStep.collectAsState()
+    val distanceToNextTurn by viewModel.distanceToNextTurnMeters.collectAsState()
 
     var hasPermission by remember { mutableStateOf(permissionHandler.hasLocationPermission()) }
     var permissionDenied by remember { mutableStateOf(false) }
@@ -135,6 +137,7 @@ fun DashboardScreen(
                         locationData = locationData,
                         routeResult = routeResult,
                         currentStep = currentStep,
+                        distanceToNextTurn = distanceToNextTurn,
                         searchState = searchState,
                         suggestions = suggestions,
                         pinLocation = pinLocation,
@@ -162,6 +165,7 @@ fun DashboardScreen(
                         locationData = locationData,
                         routeResult = routeResult,
                         currentStep = currentStep,
+                        distanceToNextTurn = distanceToNextTurn,
                         searchState = searchState,
                         suggestions = suggestions,
                         pinLocation = pinLocation,
@@ -237,6 +241,7 @@ private fun MapPanel(
     locationData: LocationData?,
     routeResult: RouteResult?,
     currentStep: NavigationStep?,
+    distanceToNextTurn: Double?,
     searchState: SearchState,
     suggestions: List<PlaceSuggestion>,
     pinLocation: Pair<Double, Double>?,
@@ -269,7 +274,7 @@ private fun MapPanel(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     if (currentStep != null) {
-                        NavigationStepBar(step = currentStep)
+                        NavigationStepBar(step = currentStep, distanceToNextTurn = distanceToNextTurn)
                     }
                     RouteSummaryBar(
                         routeResult = routeResult,
@@ -297,7 +302,7 @@ private fun MapPanel(
 }
 
 @Composable
-private fun NavigationStepBar(step: NavigationStep) {
+private fun NavigationStepBar(step: NavigationStep, distanceToNextTurn: Double?) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -320,10 +325,11 @@ private fun NavigationStepBar(step: NavigationStep) {
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2
             )
-            if (step.distanceMeters >= 50) {
+            if (distanceToNextTurn != null && distanceToNextTurn <= 500.0) {
+                val rounded = ((distanceToNextTurn / 10.0).roundToInt() * 10)
                 Text(
-                    text = formatDistance(step.distanceMeters),
-                    color = Color(0xFF8899AA),
+                    text = "in ${rounded}m",
+                    color = Color(0xFF00B4D8),
                     fontSize = 11.sp
                 )
             }

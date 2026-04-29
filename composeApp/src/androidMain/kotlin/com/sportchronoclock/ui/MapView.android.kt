@@ -18,11 +18,15 @@ import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
 
 private const val STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
 private const val ROUTE_SOURCE = "route-source"
 private const val ROUTE_LAYER = "route-layer"
+private const val USER_POS_SOURCE = "user-pos-source"
+private const val USER_ARROW_LAYER = "user-arrow-layer"
+private const val USER_ARROW_IMAGE = "user-arrow"
 
 @Composable
 actual fun MapView(
@@ -56,10 +60,23 @@ actual fun MapView(
         }
     }
 
-    // Load style + register listeners once
+    // Load style + register listeners once. Style callback adds the user-arrow layer.
     LaunchedEffect(Unit) {
         mapView.getMapAsync { map ->
-            map.setStyle(Style.Builder().fromUri(STYLE_URL))
+            map.setStyle(Style.Builder().fromUri(STYLE_URL)) { style ->
+                style.addImage(USER_ARROW_IMAGE, createUserArrowBitmap())
+                style.addSource(GeoJsonSource(USER_POS_SOURCE, buildUserPosGeoJson(latitude, longitude)))
+                style.addLayer(
+                    SymbolLayer(USER_ARROW_LAYER, USER_POS_SOURCE).withProperties(
+                        PropertyFactory.iconImage(USER_ARROW_IMAGE),
+                        PropertyFactory.iconRotate(bearing),
+                        PropertyFactory.iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP),
+                        PropertyFactory.iconAllowOverlap(true),
+                        PropertyFactory.iconIgnorePlacement(true),
+                        PropertyFactory.iconSize(1f)
+                    )
+                )
+            }
             map.uiSettings.apply {
                 isRotateGesturesEnabled = false
                 isCompassEnabled = false
@@ -85,6 +102,12 @@ actual fun MapView(
                 .bearing(bearing.toDouble())
                 .build()
             map.moveCamera(CameraUpdateFactory.newCameraPosition(target))
+            map.getStyle { style ->
+                (style.getSource(USER_POS_SOURCE) as? GeoJsonSource)
+                    ?.setGeoJson(buildUserPosGeoJson(latitude, longitude))
+                (style.getLayer(USER_ARROW_LAYER) as? SymbolLayer)
+                    ?.setProperties(PropertyFactory.iconRotate(bearing))
+            }
         }
     }
 
@@ -146,4 +169,29 @@ actual fun MapView(
     }
 
     AndroidView(modifier = modifier, factory = { mapView })
+}
+
+private fun buildUserPosGeoJson(lat: Double, lon: Double): String =
+    """{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[$lon,$lat]},"properties":{}}]}"""
+
+private fun createUserArrowBitmap(): android.graphics.Bitmap {
+    val size = 64
+    val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    val path = android.graphics.Path().apply {
+        moveTo(size / 2f, 4f)
+        lineTo(size - 10f, size - 8f)
+        lineTo(size / 2f, size - 20f)
+        lineTo(10f, size - 8f)
+        close()
+    }
+    paint.color = android.graphics.Color.WHITE
+    paint.style = android.graphics.Paint.Style.FILL
+    canvas.drawPath(path, paint)
+    paint.color = android.graphics.Color.parseColor("#0D1B2A")
+    paint.style = android.graphics.Paint.Style.STROKE
+    paint.strokeWidth = 3f
+    canvas.drawPath(path, paint)
+    return bitmap
 }
