@@ -10,6 +10,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import kotlin.math.round
 import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -254,6 +255,8 @@ private fun MapPanel(
     statusMessage: String,
     modifier: Modifier
 ) {
+    var isFollowingRider by remember { mutableStateOf(true) }
+
     if (locationData != null) {
         Box(modifier = modifier) {
             MapView(
@@ -264,8 +267,23 @@ private fun MapPanel(
                 pinLocation = pinLocation,
                 onLongPress = onLongPress,
                 onDirectionsRequested = onDirectionsRequested,
+                isFollowingRider = isFollowingRider,
+                onUserInteraction = { isFollowingRider = false },
                 modifier = Modifier.fillMaxSize()
             )
+            if (!isFollowingRider) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp)
+                        .background(Color(0xCC000000), CircleShape)
+                        .clickable { isFollowingRider = true }
+                        .padding(10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("⊙", color = Color(0xFF00B4D8), fontSize = 20.sp)
+                }
+            }
             if (routeResult != null) {
                 Column(
                     modifier = Modifier

@@ -37,12 +37,15 @@ actual fun MapView(
     pinLocation: Pair<Double, Double>?,
     onLongPress: (lat: Double, lng: Double) -> Unit,
     onDirectionsRequested: () -> Unit,
+    isFollowingRider: Boolean,
+    onUserInteraction: () -> Unit,
     modifier: Modifier
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val currentOnLongPress = rememberUpdatedState(onLongPress)
     val currentOnDirectionsRequested = rememberUpdatedState(onDirectionsRequested)
+    val currentOnUserInteraction = rememberUpdatedState(onUserInteraction)
     val pinMarkerRef = remember { arrayOfNulls<org.maplibre.android.annotations.Marker>(1) }
 
     val mapView = remember {
@@ -81,6 +84,11 @@ actual fun MapView(
                 isRotateGesturesEnabled = false
                 isCompassEnabled = false
             }
+            map.addOnCameraMoveStartedListener { reason ->
+                if (reason == org.maplibre.android.maps.MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
+                    currentOnUserInteraction.value()
+                }
+            }
             map.addOnMapLongClickListener { latLng ->
                 currentOnLongPress.value(latLng.latitude, latLng.longitude)
                 true
@@ -94,14 +102,17 @@ actual fun MapView(
 
     // Move camera instantly — animateCamera queues a new animation on every GPS update,
     // cancelling tiles mid-load and creating the "Request failed: Canceled" log storm.
-    LaunchedEffect(latitude, longitude, bearing) {
+    // Skip the camera move when the rider has panned away to inspect the route.
+    LaunchedEffect(latitude, longitude, bearing, isFollowingRider) {
         mapView.getMapAsync { map ->
-            val target = CameraPosition.Builder()
-                .target(LatLng(latitude, longitude))
-                .zoom(16.0)
-                .bearing(bearing.toDouble())
-                .build()
-            map.moveCamera(CameraUpdateFactory.newCameraPosition(target))
+            if (isFollowingRider) {
+                val target = CameraPosition.Builder()
+                    .target(LatLng(latitude, longitude))
+                    .zoom(16.0)
+                    .bearing(bearing.toDouble())
+                    .build()
+                map.moveCamera(CameraUpdateFactory.newCameraPosition(target))
+            }
             map.getStyle { style ->
                 (style.getSource(USER_POS_SOURCE) as? GeoJsonSource)
                     ?.setGeoJson(buildUserPosGeoJson(latitude, longitude))

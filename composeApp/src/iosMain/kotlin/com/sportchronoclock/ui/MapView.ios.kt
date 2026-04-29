@@ -23,7 +23,8 @@ private class UserArrowAnnotation : MKPointAnnotation()
 
 private class MapDelegate(
     var onDirectionsRequested: () -> Unit = {},
-    var onLongPress: (Double, Double) -> Unit = { _, _ -> }
+    var onLongPress: (Double, Double) -> Unit = { _, _ -> },
+    var onUserInteraction: () -> Unit = {}
 ) : NSObject(), MKMapViewDelegateProtocol {
 
     override fun mapView(
@@ -83,6 +84,13 @@ private class MapDelegate(
             coordinate.useContents { onLongPress(latitude, longitude) }
         }
     }
+
+    @ObjCAction
+    fun handleUserPan(recognizer: UIPanGestureRecognizer) {
+        if (recognizer.state == UIGestureRecognizerStateBegan) {
+            onUserInteraction()
+        }
+    }
 }
 
 @Composable
@@ -94,11 +102,14 @@ actual fun MapView(
     pinLocation: Pair<Double, Double>?,
     onLongPress: (lat: Double, lng: Double) -> Unit,
     onDirectionsRequested: () -> Unit,
+    isFollowingRider: Boolean,
+    onUserInteraction: () -> Unit,
     modifier: Modifier
 ) {
     val delegate = remember { MapDelegate() }
     val currentOnLongPress = rememberUpdatedState(onLongPress)
     val currentOnDirectionsRequested = rememberUpdatedState(onDirectionsRequested)
+    val currentOnUserInteraction = rememberUpdatedState(onUserInteraction)
     val userArrowAnnotation = remember { UserArrowAnnotation() }
 
     UIKitView(
@@ -107,6 +118,7 @@ actual fun MapView(
             MKMapView().also { map ->
                 delegate.onLongPress = { lat, lng -> currentOnLongPress.value(lat, lng) }
                 delegate.onDirectionsRequested = { currentOnDirectionsRequested.value() }
+                delegate.onUserInteraction = { currentOnUserInteraction.value() }
                 map.delegate = delegate
                 map.pitchEnabled = false
                 map.rotateEnabled = false
@@ -115,20 +127,27 @@ actual fun MapView(
                     action = NSSelectorFromString("handleLongPress:")
                 ).apply { minimumPressDuration = 0.5 }
                 map.addGestureRecognizer(recognizer)
+                val panRecognizer = UIPanGestureRecognizer(
+                    target = delegate,
+                    action = NSSelectorFromString("handleUserPan:")
+                ).apply { cancelsTouchesInView = false }
+                map.addGestureRecognizer(panRecognizer)
                 map.addAnnotation(userArrowAnnotation)
             }
         },
         update = { map ->
 
-            // Camera
-            val coordinate = CLLocationCoordinate2DMake(latitude, longitude)
-            val camera = MKMapCamera.cameraLookingAtCenterCoordinate(
-                centerCoordinate = coordinate,
-                fromDistance = 500.0,
-                pitch = 0.0,
-                heading = bearing.toDouble()
-            )
-            map.setCamera(camera, animated = true)
+            // Camera — skip when rider has panned away to inspect the route
+            if (isFollowingRider) {
+                val coordinate = CLLocationCoordinate2DMake(latitude, longitude)
+                val camera = MKMapCamera.cameraLookingAtCenterCoordinate(
+                    centerCoordinate = coordinate,
+                    fromDistance = 500.0,
+                    pitch = 0.0,
+                    heading = bearing.toDouble()
+                )
+                map.setCamera(camera, animated = true)
+            }
 
             // Route overlays
             map.overlays.filterIsInstance<MKPolyline>().forEach { map.removeOverlay(it) }
