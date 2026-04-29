@@ -138,7 +138,7 @@ actual fun MapView(
                 val (lat, lng) = pinLocation
                 val annotation = MKPointAnnotation()
                 annotation.setCoordinate(CLLocationCoordinate2DMake(lat, lng))
-                annotation.title = "Pin"
+                annotation.setTitle("Pin")
                 map.addAnnotation(annotation)
             }
         }

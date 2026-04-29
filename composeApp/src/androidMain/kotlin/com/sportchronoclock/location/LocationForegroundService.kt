@@ -70,8 +70,8 @@ class LocationForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun startLocationUpdates() {
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1_000L)
-            .setMinUpdateIntervalMillis(500L)
+        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 250L)
+            .setMinUpdateIntervalMillis(100L)
             // Deliver the first fix immediately rather than waiting for a high-accuracy lock
             .setWaitForAccurateLocation(false)
             .build()

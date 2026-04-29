@@ -5,7 +5,9 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import kotlin.math.round
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -27,6 +29,8 @@ import com.sportchronoclock.SearchState
 import com.sportchronoclock.location.LocationData
 import com.sportchronoclock.location.LocationProvider
 import com.sportchronoclock.navigation.DirectionsService
+import com.sportchronoclock.navigation.NavigationStep
+import com.sportchronoclock.navigation.PlaceSuggestion
 import com.sportchronoclock.navigation.RouteResult
 import com.sportchronoclock.permissions.PermissionHandler
 import kotlinx.coroutines.Job
@@ -47,6 +51,8 @@ fun DashboardScreen(
     val routeResult by viewModel.routeResult.collectAsState()
     val searchState by viewModel.searchState.collectAsState()
     val pinLocation by viewModel.pinLocation.collectAsState()
+    val suggestions by viewModel.suggestions.collectAsState()
+    val currentStep by viewModel.currentStep.collectAsState()
 
     var hasPermission by remember { mutableStateOf(permissionHandler.hasLocationPermission()) }
     var permissionDenied by remember { mutableStateOf(false) }
@@ -99,8 +105,6 @@ fun DashboardScreen(
                 demoRampJob[0]?.cancel()
                 isDemoActive = true
                 demoSpeed = 0f
-                // demoSpeed is snapshot state; mutations from a Main-thread coroutine are coherent —
-                // each delay(16) yields to the frame loop, which snapshots and reads the latest value.
                 demoRampJob[0] = demoScope.launch {
                     while (demoSpeed < 200f) {
                         demoSpeed = (demoSpeed + 0.5f).coerceAtMost(200f)
@@ -110,7 +114,6 @@ fun DashboardScreen(
             }
             val onDemoRelease: () -> Unit = {
                 demoRampJob[0]?.cancel()
-                // isDemoActive = false before wind-down launch; displaySpeed stays active via demoSpeed > 0f
                 isDemoActive = false
                 demoRampJob[0] = demoScope.launch {
                     while (demoSpeed > 0f) {
@@ -131,9 +134,13 @@ fun DashboardScreen(
                     MapPanel(
                         locationData = locationData,
                         routeResult = routeResult,
+                        currentStep = currentStep,
                         searchState = searchState,
+                        suggestions = suggestions,
                         pinLocation = pinLocation,
+                        onQueryChange = { viewModel.updateSearchQuery(it) },
                         onSearch = { viewModel.searchRoute(it) },
+                        onSuggestionSelected = { viewModel.routeToSuggestion(it) },
                         onClear = { viewModel.clearRoute() },
                         onLongPress = { lat, lng -> viewModel.setPinLocation(lat, lng) },
                         onDirectionsRequested = {
@@ -154,9 +161,13 @@ fun DashboardScreen(
                     MapPanel(
                         locationData = locationData,
                         routeResult = routeResult,
+                        currentStep = currentStep,
                         searchState = searchState,
+                        suggestions = suggestions,
                         pinLocation = pinLocation,
+                        onQueryChange = { viewModel.updateSearchQuery(it) },
                         onSearch = { viewModel.searchRoute(it) },
+                        onSuggestionSelected = { viewModel.routeToSuggestion(it) },
                         onClear = { viewModel.clearRoute() },
                         onLongPress = { lat, lng -> viewModel.setPinLocation(lat, lng) },
                         onDirectionsRequested = {
@@ -225,9 +236,13 @@ private fun SpeedometerPanel(
 private fun MapPanel(
     locationData: LocationData?,
     routeResult: RouteResult?,
+    currentStep: NavigationStep?,
     searchState: SearchState,
+    suggestions: List<PlaceSuggestion>,
     pinLocation: Pair<Double, Double>?,
+    onQueryChange: (String) -> Unit,
     onSearch: (String) -> Unit,
+    onSuggestionSelected: (PlaceSuggestion) -> Unit,
     onClear: () -> Unit,
     onLongPress: (Double, Double) -> Unit,
     onDirectionsRequested: () -> Unit,
@@ -246,19 +261,28 @@ private fun MapPanel(
                 onDirectionsRequested = onDirectionsRequested,
                 modifier = Modifier.fillMaxSize()
             )
-            // Search bar at bottom — replaced by route summary when navigating
             if (routeResult != null) {
-                RouteSummaryBar(
-                    routeResult = routeResult,
-                    onClear = onClear,
+                Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(12.dp)
-                )
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (currentStep != null) {
+                        NavigationStepBar(step = currentStep)
+                    }
+                    RouteSummaryBar(
+                        routeResult = routeResult,
+                        onClear = onClear
+                    )
+                }
             } else {
                 SearchBar(
                     searchState = searchState,
+                    suggestions = suggestions,
+                    onQueryChange = onQueryChange,
                     onSearch = onSearch,
+                    onSuggestionSelected = onSuggestionSelected,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(12.dp)
@@ -273,9 +297,47 @@ private fun MapPanel(
 }
 
 @Composable
+private fun NavigationStepBar(step: NavigationStep) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xF0071420), RoundedCornerShape(14.dp))
+            .border(1.dp, Color(0xFF00B4D8), RoundedCornerShape(14.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = maneuverIcon(step.maneuverType, step.maneuverModifier),
+            fontSize = 26.sp,
+            color = Color(0xFF00B4D8)
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = step.instruction,
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2
+            )
+            if (step.distanceMeters >= 50) {
+                Text(
+                    text = formatDistance(step.distanceMeters),
+                    color = Color(0xFF8899AA),
+                    fontSize = 11.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun SearchBar(
     searchState: SearchState,
+    suggestions: List<PlaceSuggestion>,
+    onQueryChange: (String) -> Unit,
     onSearch: (String) -> Unit,
+    onSuggestionSelected: (PlaceSuggestion) -> Unit,
     modifier: Modifier
 ) {
     var query by remember { mutableStateOf("") }
@@ -283,6 +345,53 @@ private fun SearchBar(
     val errorMessage = (searchState as? SearchState.Error)?.message
 
     Column(modifier = modifier.fillMaxWidth()) {
+        if (suggestions.isNotEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xF0111111), RoundedCornerShape(12.dp))
+                    .padding(vertical = 4.dp)
+            ) {
+                suggestions.forEachIndexed { index, suggestion ->
+                    val displayName = suggestion.name.split(",")
+                        .take(2).joinToString(", ").trim()
+                    Text(
+                        text = displayName,
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                query = ""
+                                onSuggestionSelected(suggestion)
+                            }
+                            .padding(horizontal = 16.dp, vertical = 11.dp)
+                    )
+                    if (index < suggestions.lastIndex) {
+                        HorizontalDivider(
+                            color = Color(0xFF2A2A2A),
+                            thickness = 0.5.dp,
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        if (errorMessage != null) {
+            Text(
+                text = errorMessage,
+                color = Color(0xFFFF5252),
+                fontSize = 12.sp,
+                modifier = Modifier
+                    .padding(bottom = 4.dp)
+                    .background(Color(0xCC000000), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -293,7 +402,10 @@ private fun SearchBar(
         ) {
             TextField(
                 value = query,
-                onValueChange = { query = it },
+                onValueChange = {
+                    query = it
+                    onQueryChange(it)
+                },
                 placeholder = { Text("Search destination…", fontSize = 13.sp) },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
@@ -329,28 +441,16 @@ private fun SearchBar(
                 }
             }
         }
-        if (errorMessage != null) {
-            Text(
-                text = errorMessage,
-                color = Color(0xFFFF5252),
-                fontSize = 12.sp,
-                modifier = Modifier
-                    .padding(top = 4.dp, start = 4.dp, end = 4.dp)
-                    .background(Color(0xCC000000), RoundedCornerShape(4.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            )
-        }
     }
 }
 
 @Composable
 private fun RouteSummaryBar(
     routeResult: RouteResult,
-    onClear: () -> Unit,
-    modifier: Modifier
+    onClear: () -> Unit
 ) {
     Row(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xE6000000), RoundedCornerShape(14.dp))
             .border(1.dp, Color(0xFF1E88E5), RoundedCornerShape(14.dp))
@@ -360,13 +460,13 @@ private fun RouteSummaryBar(
     ) {
         Column {
             Text(
-                text = "%.1f km · %d min".format(routeResult.distanceKm, routeResult.durationMinutes),
+                text = "${round(routeResult.distanceKm * 10) / 10} km · ${routeResult.durationMinutes} min",
                 color = Color(0xFF1E88E5),
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp
             )
             Text(
-                text = routeResult.destinationName.take(50),
+                text = routeResult.destinationName.split(",").take(2).joinToString(", ").trim().take(50),
                 color = Color(0xFF8899AA),
                 fontSize = 10.sp,
                 maxLines = 1
@@ -382,4 +482,34 @@ private fun RouteSummaryBar(
             )
         }
     }
+}
+
+private fun maneuverIcon(type: String, modifier: String?): String = when (type) {
+    "depart" -> "▶"
+    "arrive" -> "⬤"
+    "turn" -> when (modifier) {
+        "left" -> "↰"
+        "right" -> "↱"
+        "slight left" -> "↖"
+        "slight right" -> "↗"
+        "sharp left" -> "↩"
+        "sharp right" -> "↪"
+        "uturn" -> "↩"
+        else -> "↑"
+    }
+    "merge" -> "⤵"
+    "on ramp", "ramp" -> "↗"
+    "off ramp" -> "↘"
+    "fork" -> when (modifier) {
+        "left" -> "↰"
+        "right" -> "↱"
+        else -> "↑"
+    }
+    "roundabout", "rotary", "roundabout turn", "exit roundabout" -> "↻"
+    else -> "↑"
+}
+
+private fun formatDistance(meters: Double): String = when {
+    meters >= 1000 -> "${round(meters / 100) / 10} km"
+    else -> "${meters.toInt()} m"
 }

@@ -12,6 +12,7 @@ import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.LineLayer
@@ -42,7 +43,17 @@ actual fun MapView(
 
     val mapView = remember {
         MapLibre.getInstance(context)
-        MapView(context).apply { onCreate(null) }
+        // TextureView avoids SurfaceView Z-order conflicts with Compose.
+        // onCreate + onStart + onResume are called synchronously here — before AndroidView
+        // adds the MapView to the hierarchy and the GL thread starts. Without this, the
+        // GL thread can fire onDrawFrame before the native renderer is initialised (SIGSEGV,
+        // fault addr 0x30), because DisposableEffect runs after the first frame.
+        val options = MapLibreMapOptions.createFromAttributes(context).textureMode(true)
+        MapView(context, options).apply {
+            onCreate(null)
+            onStart()
+            onResume()
+        }
     }
 
     // Load style + register listeners once
@@ -64,7 +75,8 @@ actual fun MapView(
         }
     }
 
-    // Animate camera to current position
+    // Move camera instantly — animateCamera queues a new animation on every GPS update,
+    // cancelling tiles mid-load and creating the "Request failed: Canceled" log storm.
     LaunchedEffect(latitude, longitude, bearing) {
         mapView.getMapAsync { map ->
             val target = CameraPosition.Builder()
@@ -72,7 +84,7 @@ actual fun MapView(
                 .zoom(16.0)
                 .bearing(bearing.toDouble())
                 .build()
-            map.animateCamera(CameraUpdateFactory.newCameraPosition(target), 800)
+            map.moveCamera(CameraUpdateFactory.newCameraPosition(target))
         }
     }
 
@@ -115,7 +127,9 @@ actual fun MapView(
         }
     }
 
-    // Forward Android lifecycle events
+    // Handle subsequent lifecycle transitions. LifecycleRegistry replays past events
+    // when addObserver is called, so onStart/onResume will be dispatched again — that
+    // is harmless because MapView guards against double-resume.
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
