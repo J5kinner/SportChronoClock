@@ -19,6 +19,7 @@ data class OsrmResponse(
 @Serializable
 data class OsrmRoute(
     val geometry: OsrmGeometry,
+    val legs: List<OsrmLeg> = emptyList(),
     val duration: Double,
     val distance: Double
 )
@@ -28,9 +29,43 @@ data class OsrmGeometry(
     val coordinates: List<List<Double>>   // GeoJSON order: [longitude, latitude]
 )
 
+@Serializable
+data class OsrmLeg(
+    val steps: List<OsrmStep> = emptyList()
+)
+
+@Serializable
+data class OsrmStep(
+    val distance: Double = 0.0,
+    val name: String = "",
+    val maneuver: OsrmManeuver
+)
+
+@Serializable
+data class OsrmManeuver(
+    val type: String = "",
+    val modifier: String? = null,
+    val location: List<Double> = emptyList()   // GeoJSON order: [longitude, latitude]
+)
+
+data class NavigationStep(
+    val instruction: String,
+    val distanceMeters: Double,
+    val maneuverType: String,
+    val maneuverModifier: String?,
+    val coordinate: Pair<Double, Double>   // (latitude, longitude)
+)
+
+data class PlaceSuggestion(
+    val name: String,
+    val lat: Double,
+    val lon: Double
+)
+
 data class RouteResult(
     val destinationName: String,
-    val points: List<Pair<Double, Double>>, // (latitude, longitude)
+    val points: List<Pair<Double, Double>>,   // (latitude, longitude)
+    val steps: List<NavigationStep> = emptyList(),
     val distanceMeters: Double,
     val durationSeconds: Double
 ) {

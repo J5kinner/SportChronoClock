@@ -12,5 +12,7 @@ expect fun MapView(
     pinLocation: Pair<Double, Double>? = null,
     onLongPress: (lat: Double, lng: Double) -> Unit = { _, _ -> },
     onDirectionsRequested: () -> Unit = {},
+    isFollowingRider: Boolean = true,
+    onUserInteraction: () -> Unit = {},
     modifier: Modifier = Modifier
 )

@@ -8,16 +8,23 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.interop.UIKitView
 import kotlinx.cinterop.*
+import platform.CoreGraphics.CGAffineTransformMakeRotation
+import platform.CoreGraphics.CGPointMake
+import platform.CoreGraphics.CGSizeMake
 import platform.CoreLocation.CLLocationCoordinate2D
 import platform.CoreLocation.CLLocationCoordinate2DMake
 import platform.Foundation.NSSelectorFromString
 import platform.MapKit.*
 import platform.UIKit.*
 import platform.darwin.NSObject
+import kotlin.math.PI
+
+private class UserArrowAnnotation : MKPointAnnotation()
 
 private class MapDelegate(
     var onDirectionsRequested: () -> Unit = {},
-    var onLongPress: (Double, Double) -> Unit = { _, _ -> }
+    var onLongPress: (Double, Double) -> Unit = { _, _ -> },
+    var onUserInteraction: () -> Unit = {}
 ) : NSObject(), MKMapViewDelegateProtocol {
 
     override fun mapView(
@@ -38,6 +45,15 @@ private class MapDelegate(
         viewForAnnotation: MKAnnotationProtocol
     ): MKAnnotationView? {
         if (viewForAnnotation is MKUserLocation) return null
+        if (viewForAnnotation is UserArrowAnnotation) {
+            val view = MKAnnotationView(
+                annotation = viewForAnnotation,
+                reuseIdentifier = "user-arrow"
+            )
+            view.image = createArrowImage()
+            view.canShowCallout = false
+            return view
+        }
         return MKPinAnnotationView(
             annotation = viewForAnnotation,
             reuseIdentifier = "pin"
@@ -68,6 +84,13 @@ private class MapDelegate(
             coordinate.useContents { onLongPress(latitude, longitude) }
         }
     }
+
+    @ObjCAction
+    fun handleUserPan(recognizer: UIPanGestureRecognizer) {
+        if (recognizer.state == UIGestureRecognizerStateBegan) {
+            onUserInteraction()
+        }
+    }
 }
 
 @Composable
@@ -79,11 +102,15 @@ actual fun MapView(
     pinLocation: Pair<Double, Double>?,
     onLongPress: (lat: Double, lng: Double) -> Unit,
     onDirectionsRequested: () -> Unit,
+    isFollowingRider: Boolean,
+    onUserInteraction: () -> Unit,
     modifier: Modifier
 ) {
     val delegate = remember { MapDelegate() }
     val currentOnLongPress = rememberUpdatedState(onLongPress)
     val currentOnDirectionsRequested = rememberUpdatedState(onDirectionsRequested)
+    val currentOnUserInteraction = rememberUpdatedState(onUserInteraction)
+    val userArrowAnnotation = remember { UserArrowAnnotation() }
 
     UIKitView(
         modifier = modifier,
@@ -91,8 +118,8 @@ actual fun MapView(
             MKMapView().also { map ->
                 delegate.onLongPress = { lat, lng -> currentOnLongPress.value(lat, lng) }
                 delegate.onDirectionsRequested = { currentOnDirectionsRequested.value() }
+                delegate.onUserInteraction = { currentOnUserInteraction.value() }
                 map.delegate = delegate
-                map.showsUserLocation = true
                 map.pitchEnabled = false
                 map.rotateEnabled = false
                 val recognizer = UILongPressGestureRecognizer(
@@ -100,19 +127,27 @@ actual fun MapView(
                     action = NSSelectorFromString("handleLongPress:")
                 ).apply { minimumPressDuration = 0.5 }
                 map.addGestureRecognizer(recognizer)
+                val panRecognizer = UIPanGestureRecognizer(
+                    target = delegate,
+                    action = NSSelectorFromString("handleUserPan:")
+                ).apply { cancelsTouchesInView = false }
+                map.addGestureRecognizer(panRecognizer)
+                map.addAnnotation(userArrowAnnotation)
             }
         },
         update = { map ->
 
-            // Camera
-            val coordinate = CLLocationCoordinate2DMake(latitude, longitude)
-            val camera = MKMapCamera.cameraLookingAtCenterCoordinate(
-                centerCoordinate = coordinate,
-                fromDistance = 500.0,
-                pitch = 0.0,
-                heading = bearing.toDouble()
-            )
-            map.setCamera(camera, animated = true)
+            // Camera — skip when rider has panned away to inspect the route
+            if (isFollowingRider) {
+                val coordinate = CLLocationCoordinate2DMake(latitude, longitude)
+                val camera = MKMapCamera.cameraLookingAtCenterCoordinate(
+                    centerCoordinate = coordinate,
+                    fromDistance = 500.0,
+                    pitch = 0.0,
+                    heading = bearing.toDouble()
+                )
+                map.setCamera(camera, animated = true)
+            }
 
             // Route overlays
             map.overlays.filterIsInstance<MKPolyline>().forEach { map.removeOverlay(it) }
@@ -132,7 +167,7 @@ actual fun MapView(
             // Pin annotation — remove any existing, add new one if set
             map.annotations
                 .filterIsInstance<MKPointAnnotation>()
-                .filter { it !is MKUserLocation }
+                .filter { it !is UserArrowAnnotation }
                 .forEach { map.removeAnnotation(it) }
             if (pinLocation != null) {
                 val (lat, lng) = pinLocation
@@ -141,6 +176,32 @@ actual fun MapView(
                 annotation.title = "Pin"
                 map.addAnnotation(annotation)
             }
+
+            // Update arrow position and bearing
+            userArrowAnnotation.setCoordinate(CLLocationCoordinate2DMake(latitude, longitude))
+            val arrowView = map.viewForAnnotation(userArrowAnnotation)
+            if (arrowView != null) {
+                arrowView.transform = CGAffineTransformMakeRotation(bearing.toDouble() * PI / 180.0)
+            }
         }
     )
+}
+
+private fun createArrowImage(): UIImage {
+    val size = CGSizeMake(32.0, 32.0)
+    UIGraphicsBeginImageContextWithOptions(size, false, 0.0)
+    val path = UIBezierPath()
+    path.moveToPoint(CGPointMake(16.0, 2.0))
+    path.addLineToPoint(CGPointMake(28.0, 28.0))
+    path.addLineToPoint(CGPointMake(16.0, 20.0))
+    path.addLineToPoint(CGPointMake(4.0, 28.0))
+    path.closePath()
+    UIColor.whiteColor.setFill()
+    path.fill()
+    UIColor(red = 0.05, green = 0.11, blue = 0.16, alpha = 1.0).setStroke()
+    path.lineWidth = 2.0
+    path.stroke()
+    val image = UIGraphicsGetImageFromCurrentImageContext()!!
+    UIGraphicsEndImageContext()
+    return image
 }
