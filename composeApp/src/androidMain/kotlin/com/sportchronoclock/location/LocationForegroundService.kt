@@ -42,7 +42,8 @@ class LocationForegroundService : Service() {
                         longitude = loc.longitude,
                         speed = loc.speed,
                         bearing = loc.bearing,
-                        timestamp = loc.time
+                        timestamp = loc.time,
+                        hasSpeed = loc.hasSpeed()
                     )
                 )
             }
@@ -71,6 +72,8 @@ class LocationForegroundService : Service() {
     private fun startLocationUpdates() {
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1_000L)
             .setMinUpdateIntervalMillis(500L)
+            // Deliver the first fix immediately rather than waiting for a high-accuracy lock
+            .setWaitForAccurateLocation(false)
             .build()
         try {
             fusedClient.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())

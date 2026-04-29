@@ -32,16 +32,19 @@ class MainViewModel(
     val pinLocation: StateFlow<Pair<Double, Double>?> = _pinLocation.asStateFlow()
 
     // Low-pass filter: higher alpha = more responsive, lower = smoother
-    private val alpha = 0.15f
+    private val alpha = 0.3f
     private var filteredSpeed = 0f
 
     init {
         viewModelScope.launch {
             locationProvider.locationFlow.collect { data ->
                 _locationData.value = data
-                val rawKmh = maxOf(0f, data.speed) * 3.6f
-                filteredSpeed = alpha * rawKmh + (1f - alpha) * filteredSpeed
-                _speedKmh.value = filteredSpeed
+                // Only use speed when the platform signals a valid GPS speed fix
+                if (data.hasSpeed) {
+                    val rawKmh = maxOf(0f, data.speed) * 3.6f
+                    filteredSpeed = alpha * rawKmh + (1f - alpha) * filteredSpeed
+                    _speedKmh.value = filteredSpeed
+                }
             }
         }
     }
