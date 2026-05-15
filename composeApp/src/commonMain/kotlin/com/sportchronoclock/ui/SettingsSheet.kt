@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.sp
 import com.sportchronoclock.settings.DisplayMode
 import com.sportchronoclock.settings.SettingsViewModel
 import com.sportchronoclock.settings.SpeedUnits
-import com.sportchronoclock.settings.SpeedoSkin
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -74,16 +73,6 @@ fun SettingsSheet(
                 options = listOf("KM/H" to SpeedUnits.KMH, "MPH" to SpeedUnits.MPH),
                 selected = state.speedUnits,
                 onSelect = vm::setUnits,
-            )
-
-            SectionTitle("Speedometer Skin")
-            SegmentedControl(
-                options = listOf(
-                    "BMW M" to SpeedoSkin.BMW_M,
-                    "Track Black" to SpeedoSkin.TRACK_BLACK,
-                ),
-                selected = state.speedoSkin,
-                onSelect = vm::setSkin,
             )
 
             SectionTitle("Display Mode")

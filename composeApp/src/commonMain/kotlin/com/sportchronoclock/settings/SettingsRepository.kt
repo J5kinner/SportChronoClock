@@ -6,7 +6,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 private const val KEY_UNITS = "speed_units"
-private const val KEY_SKIN = "speedo_skin"
 private const val KEY_DISPLAY_MODE = "display_mode"
 private const val KEY_VOICE = "voice_cues_enabled"
 private const val KEY_SPORT_ON_START = "sport_on_start"
@@ -18,7 +17,6 @@ class SettingsRepository(private val settings: Settings) {
 
     private fun load(): UserSettings = UserSettings(
         speedUnits = settings.parseEnum(KEY_UNITS, SpeedUnits.KMH) { SpeedUnits.valueOf(it) },
-        speedoSkin = settings.parseEnum(KEY_SKIN, SpeedoSkin.BMW_M) { SpeedoSkin.valueOf(it) },
         displayMode = settings.parseEnum(KEY_DISPLAY_MODE, DisplayMode.NIGHT) { DisplayMode.valueOf(it) },
         voiceCuesEnabled = settings.getBoolean(KEY_VOICE, true),
         sportModeOnStart = settings.getBoolean(KEY_SPORT_ON_START, false),
@@ -27,11 +25,6 @@ class SettingsRepository(private val settings: Settings) {
     fun setUnits(value: SpeedUnits) {
         settings.putString(KEY_UNITS, value.name)
         _state.value = _state.value.copy(speedUnits = value)
-    }
-
-    fun setSkin(value: SpeedoSkin) {
-        settings.putString(KEY_SKIN, value.name)
-        _state.value = _state.value.copy(speedoSkin = value)
     }
 
     fun setDisplayMode(value: DisplayMode) {
