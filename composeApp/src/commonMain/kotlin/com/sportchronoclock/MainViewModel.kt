@@ -8,6 +8,8 @@ import com.sportchronoclock.navigation.DirectionsService
 import com.sportchronoclock.navigation.NavigationStep
 import com.sportchronoclock.navigation.PlaceSuggestion
 import com.sportchronoclock.navigation.RouteResult
+import com.sportchronoclock.ride.RideEvent
+import com.sportchronoclock.ride.RideEventBus
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +20,8 @@ import kotlin.math.*
 
 class MainViewModel(
     private val locationProvider: LocationProvider,
-    private val directionsService: DirectionsService
+    private val directionsService: DirectionsService,
+    private val rideEventBus: RideEventBus,
 ) : ViewModel() {
 
     private val _speedKmh = MutableStateFlow(0f)
@@ -58,10 +61,27 @@ class MainViewModel(
         viewModelScope.launch {
             locationProvider.locationFlow.collect { data ->
                 _locationData.value = data
+                rideEventBus.tryEmit(
+                    RideEvent.LocationSample(
+                        lat = data.latitude,
+                        lng = data.longitude,
+                        altitudeMeters = null,
+                        accuracyMeters = null,
+                        timestamp = data.timestamp,
+                    )
+                )
                 if (data.hasSpeed) {
-                    val rawKmh = maxOf(0f, data.speed) * 3.6f
+                    val rawMps = maxOf(0f, data.speed)
+                    val rawKmh = rawMps * 3.6f
                     filteredSpeed = alpha * rawKmh + (1f - alpha) * filteredSpeed
                     _speedKmh.value = filteredSpeed
+                    rideEventBus.tryEmit(
+                        RideEvent.SpeedSample(
+                            speedMps = rawMps,
+                            speedKmh = filteredSpeed,
+                            timestamp = data.timestamp,
+                        )
+                    )
                 }
                 // Step advancement, distance, and reroute run on every tick regardless of speed fix
                 advanceStepIfNeeded(data)

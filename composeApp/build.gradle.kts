@@ -7,6 +7,15 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.sqldelight)
+}
+
+sqldelight {
+    databases {
+        create("RideDatabase") {
+            packageName.set("com.sportchronoclock.db")
+        }
+    }
 }
 
 kotlin {
@@ -35,6 +44,9 @@ kotlin {
             implementation(libs.maplibre.android)
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.sqldelight.android)
+            // Force 16 KB page-size aligned graphics-path (overrides Compose 1.10's transitive 1.0.1)
+            implementation(libs.androidx.graphics.path)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
@@ -47,14 +59,21 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
+            implementation(libs.koin.compose.viewmodel)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.json)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.multiplatform.settings)
+            implementation(libs.multiplatform.settings.coroutines)
+            implementation(libs.kotlinx.datetime)
+            implementation(libs.sqldelight.runtime)
+            implementation(libs.sqldelight.coroutines)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
+            implementation(libs.sqldelight.native)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -79,6 +98,9 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+        jniLibs {
+            useLegacyPackaging = false
         }
     }
     buildTypes {

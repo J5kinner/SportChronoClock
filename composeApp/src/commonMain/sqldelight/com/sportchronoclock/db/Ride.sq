@@ -1,0 +1,59 @@
+CREATE TABLE ride (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at INTEGER NOT NULL,
+    ended_at INTEGER,
+    distance_meters REAL NOT NULL DEFAULT 0.0,
+    duration_seconds INTEGER NOT NULL DEFAULT 0,
+    max_speed_kmh REAL NOT NULL DEFAULT 0.0,
+    avg_moving_speed_kmh REAL NOT NULL DEFAULT 0.0,
+    max_lean_deg REAL,
+    max_lateral_g REAL,
+    elevation_gain_meters REAL,
+    polyline_geojson TEXT,
+    crashed_flag INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX ride_started_at_idx ON ride(started_at DESC);
+CREATE INDEX ride_active_idx ON ride(ended_at) WHERE ended_at IS NULL;
+
+insertRide:
+INSERT INTO ride (started_at) VALUES (?);
+
+lastInsertRowId:
+SELECT last_insert_rowid();
+
+finalizeRide:
+UPDATE ride
+SET ended_at = :endedAt,
+    distance_meters = :distanceMeters,
+    duration_seconds = :durationSeconds,
+    max_speed_kmh = :maxSpeedKmh,
+    avg_moving_speed_kmh = :avgMovingSpeedKmh,
+    max_lean_deg = :maxLeanDeg,
+    max_lateral_g = :maxLateralG,
+    elevation_gain_meters = :elevationGainMeters,
+    polyline_geojson = :polylineGeojson,
+    crashed_flag = :crashedFlag
+WHERE id = :id;
+
+selectCompleted:
+SELECT * FROM ride
+WHERE ended_at IS NOT NULL
+ORDER BY started_at DESC;
+
+selectActive:
+SELECT * FROM ride
+WHERE ended_at IS NULL
+ORDER BY started_at DESC
+LIMIT 1;
+
+selectById:
+SELECT * FROM ride WHERE id = :id;
+
+deleteRide:
+DELETE FROM ride WHERE id = :id;
+
+markCrashed:
+UPDATE ride
+SET crashed_flag = 1, ended_at = :endedAt
+WHERE id = :id AND ended_at IS NULL;

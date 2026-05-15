@@ -21,6 +21,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sportchronoclock.format.UnitFormatter
+import com.sportchronoclock.settings.SpeedUnits
+import com.sportchronoclock.settings.SpeedoSkin
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -37,21 +40,44 @@ private val BadgeBorder = Color(0xFF1a2a3a)
 private val MBlue = Color(0xFF0057B8)
 private val MViolet = Color(0xFF6B2F8A)
 private val MRed = Color(0xFFC8102E)
+private val TrackAccent = Color(0xFFC8102E)
+private val TrackDim = Color(0xFF2a0a10)
 
 @Composable
 fun SpeedometerGauge(
     speedKmh: Float,
-    maxSpeed: Float = 200f,
-    modifier: Modifier = Modifier
+    units: SpeedUnits = SpeedUnits.KMH,
+    skin: SpeedoSkin = SpeedoSkin.BMW_M,
+    modifier: Modifier = Modifier,
 ) {
-    val progress = (speedKmh / maxSpeed).coerceIn(0f, 1f)
+    when (skin) {
+        SpeedoSkin.BMW_M -> BmwMSkin(speedKmh = speedKmh, units = units, modifier = modifier)
+        SpeedoSkin.TRACK_BLACK -> TrackBlackSkin(speedKmh = speedKmh, units = units, modifier = modifier)
+    }
+}
+
+@Composable
+private fun BmwMSkin(
+    speedKmh: Float,
+    units: SpeedUnits,
+    modifier: Modifier,
+) {
+    val maxSpeed = UnitFormatter.maxScaleSpeed(units)
+    val displayValue = UnitFormatter.displaySpeed(speedKmh, units)
+    val displayValueFloat = when (units) {
+        SpeedUnits.KMH -> speedKmh
+        SpeedUnits.MPH -> speedKmh * 0.6213711922f
+    }
+    val progress = (displayValueFloat / maxSpeed).coerceIn(0f, 1f)
+    val labels = UnitFormatter.majorTickLabels(units)
+    val unitLabel = UnitFormatter.speedLabel(units)
     val startAngle = 150f
     val totalSweep = 240f
     val textMeasurer = rememberTextMeasurer()
 
     Box(
         modifier = modifier.background(Color.Black),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val strokeWidth = size.minDimension * 0.07f
@@ -59,12 +85,11 @@ fun SpeedometerGauge(
             val arcSize = Size(size.minDimension - inset * 2, size.minDimension - inset * 2)
             val arcOffset = Offset(
                 (size.width - arcSize.width) / 2f,
-                (size.height - arcSize.height) / 2f
+                (size.height - arcSize.height) / 2f,
             )
             val arcRadius = arcSize.width / 2f
             val center = Offset(size.width / 2f, size.height / 2f)
 
-            // Background track
             drawArc(
                 color = ArcTrack,
                 startAngle = startAngle,
@@ -72,11 +97,10 @@ fun SpeedometerGauge(
                 useCenter = false,
                 topLeft = arcOffset,
                 size = arcSize,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
             )
 
             if (progress > 0f) {
-                // Glow layer
                 drawArc(
                     color = ProgressStart.copy(alpha = 0.25f),
                     startAngle = startAngle,
@@ -84,25 +108,23 @@ fun SpeedometerGauge(
                     useCenter = false,
                     topLeft = arcOffset,
                     size = arcSize,
-                    style = Stroke(width = strokeWidth * 2.2f, cap = StrokeCap.Round)
+                    style = Stroke(width = strokeWidth * 2.2f, cap = StrokeCap.Round),
                 )
-                // Progress arc
                 drawArc(
                     brush = Brush.linearGradient(
                         colors = listOf(ProgressStart, ProgressEnd),
                         start = Offset(arcOffset.x, arcOffset.y + arcSize.height),
-                        end = Offset(arcOffset.x + arcSize.width, arcOffset.y)
+                        end = Offset(arcOffset.x + arcSize.width, arcOffset.y),
                     ),
                     startAngle = startAngle,
                     sweepAngle = totalSweep * progress,
                     useCenter = false,
                     topLeft = arcOffset,
                     size = arcSize,
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
                 )
             }
 
-            // Tick marks drawn outside the arc ring — 13 positions every 20°
             val tickStartR = arcRadius + strokeWidth / 2f + size.minDimension * 0.015f
             val minorLen = size.minDimension * 0.04f
             val majorLen = size.minDimension * 0.07f
@@ -122,58 +144,55 @@ fun SpeedometerGauge(
                     start = Offset(center.x + tickStartR * cosA, center.y + tickStartR * sinA),
                     end = Offset(
                         center.x + (tickStartR + len) * cosA,
-                        center.y + (tickStartR + len) * sinA
+                        center.y + (tickStartR + len) * sinA,
                     ),
-                    strokeWidth = sw
+                    strokeWidth = sw,
                 )
             }
 
-            // Speed labels at major tick positions (0, 50, 100, 150, 200)
             val labelR = tickStartR + majorLen + size.minDimension * 0.045f
-            val labelValues = listOf("0", "50", "100", "150", "200")
             majorIndices.sorted().forEachIndexed { idx, majorIdx ->
                 val t = majorIdx * (totalSweep / 12f)
                 val angleRad = ((startAngle + t) * PI / 180.0).toFloat()
                 val cosA = cos(angleRad)
                 val sinA = sin(angleRad)
                 val layout = textMeasurer.measure(
-                    text = labelValues[idx],
-                    style = TextStyle(color = LabelColor, fontSize = 9.sp)
+                    text = labels[idx],
+                    style = TextStyle(color = LabelColor, fontSize = 9.sp),
                 )
                 drawText(
                     textLayoutResult = layout,
                     topLeft = Offset(
                         x = center.x + labelR * cosA - layout.size.width / 2f,
-                        y = center.y + labelR * sinA - layout.size.height / 2f
-                    )
+                        y = center.y + labelR * sinA - layout.size.height / 2f,
+                    ),
                 )
             }
         }
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                text = speedKmh.toInt().toString(),
+                text = displayValue.toString(),
                 fontSize = 52.sp,
                 fontWeight = FontWeight.Light,
-                color = SpeedTextColor
+                color = SpeedTextColor,
             )
             Text(
-                text = "KM/H",
+                text = unitLabel,
                 fontSize = 10.sp,
                 color = UnitTextColor,
-                letterSpacing = 4.sp
+                letterSpacing = 4.sp,
             )
             Spacer(Modifier.height(8.dp))
-            // BMW M Badge
             Box(
                 modifier = Modifier
                     .background(BadgeBackground, RoundedCornerShape(4.dp))
                     .border(0.5.dp, BadgeBorder, RoundedCornerShape(4.dp))
                     .padding(horizontal = 8.dp, vertical = 3.dp),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
@@ -181,7 +200,7 @@ fun SpeedometerGauge(
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Black,
                         color = MBlue,
-                        letterSpacing = 1.sp
+                        letterSpacing = 1.sp,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) {
                         Box(Modifier.width(7.dp).height(2.dp).background(MBlue, RoundedCornerShape(1.dp)))
@@ -190,6 +209,70 @@ fun SpeedometerGauge(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun TrackBlackSkin(
+    speedKmh: Float,
+    units: SpeedUnits,
+    modifier: Modifier,
+) {
+    val displayValue = UnitFormatter.displaySpeed(speedKmh, units)
+    val unitLabel = UnitFormatter.speedLabel(units)
+    val maxSpeed = UnitFormatter.maxScaleSpeed(units)
+    val progress = when (units) {
+        SpeedUnits.KMH -> (speedKmh / maxSpeed).coerceIn(0f, 1f)
+        SpeedUnits.MPH -> ((speedKmh * 0.6213711922f) / maxSpeed).coerceIn(0f, 1f)
+    }
+
+    Box(
+        modifier = modifier.background(Color.Black),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val barHeight = size.height * 0.06f
+            val barTop = size.height * 0.78f
+            val barLeft = size.width * 0.10f
+            val barWidth = size.width * 0.80f
+
+            drawRoundRect(
+                color = TrackDim,
+                topLeft = Offset(barLeft, barTop),
+                size = Size(barWidth, barHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(barHeight / 2f),
+            )
+            if (progress > 0f) {
+                drawRoundRect(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(TrackAccent.copy(alpha = 0.7f), TrackAccent),
+                    ),
+                    topLeft = Offset(barLeft, barTop),
+                    size = Size(barWidth * progress, barHeight),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(barHeight / 2f),
+                )
+            }
+        }
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = displayValue.toString(),
+                fontSize = 96.sp,
+                fontWeight = FontWeight.Black,
+                color = Color.White,
+                letterSpacing = (-4).sp,
+            )
+            Text(
+                text = unitLabel,
+                fontSize = 11.sp,
+                color = TrackAccent,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 6.sp,
+            )
         }
     }
 }

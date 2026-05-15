@@ -25,28 +25,39 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sportchronoclock.MainViewModel
 import com.sportchronoclock.SearchState
 import com.sportchronoclock.location.LocationData
-import com.sportchronoclock.location.LocationProvider
-import com.sportchronoclock.navigation.DirectionsService
 import com.sportchronoclock.navigation.NavigationStep
 import com.sportchronoclock.navigation.PlaceSuggestion
 import com.sportchronoclock.navigation.RouteResult
+import com.sportchronoclock.media.MediaControlViewModel
 import com.sportchronoclock.permissions.PermissionHandler
+import com.sportchronoclock.ride.RideStatsViewModel
+import com.sportchronoclock.settings.SettingsViewModel
+import com.sportchronoclock.settings.SpeedUnits
+import com.sportchronoclock.settings.SpeedoSkin
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun DashboardScreen(
-    permissionHandler: PermissionHandler = koinInject()
+    onOpenHistory: () -> Unit,
+    onOpenSport: () -> Unit,
+    onOpenSettings: () -> Unit,
+    permissionHandler: PermissionHandler = koinInject(),
 ) {
-    val locationProvider = koinInject<LocationProvider>()
-    val directionsService = koinInject<DirectionsService>()
-    val viewModel: MainViewModel = viewModel { MainViewModel(locationProvider, directionsService) }
+    val viewModel: MainViewModel = koinViewModel()
+    val statsViewModel: RideStatsViewModel = koinViewModel()
+    val settingsViewModel: SettingsViewModel = koinViewModel()
+    val mediaViewModel: MediaControlViewModel = koinViewModel()
+    val liveStats by statsViewModel.liveStats.collectAsState()
+    val settings by settingsViewModel.state.collectAsState()
+    val mediaInfo by mediaViewModel.info.collectAsState()
+    val mediaAccess by mediaViewModel.accessState.collectAsState()
 
     val speedKmh by viewModel.speedKmh.collectAsState()
     val locationData by viewModel.locationData.collectAsState()
@@ -101,7 +112,7 @@ fun DashboardScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(top = 0.dp)) {
             val isLandscape = maxWidth > maxHeight
 
             val onDemoPress: () -> Unit = {
@@ -130,6 +141,8 @@ fun DashboardScreen(
                 Row(modifier = Modifier.fillMaxSize()) {
                     SpeedometerPanel(
                         displaySpeed = displaySpeed,
+                        units = settings.speedUnits,
+                        skin = settings.speedoSkin,
                         onDemoPress = onDemoPress,
                         onDemoRelease = onDemoRelease,
                         modifier = Modifier.fillMaxHeight().weight(0.4f)
@@ -158,6 +171,8 @@ fun DashboardScreen(
                 Column(modifier = Modifier.fillMaxSize()) {
                     SpeedometerPanel(
                         displaySpeed = displaySpeed,
+                        units = settings.speedUnits,
+                        skin = settings.speedoSkin,
                         onDemoPress = onDemoPress,
                         onDemoRelease = onDemoRelease,
                         modifier = Modifier.fillMaxWidth().weight(0.4f)
@@ -184,12 +199,80 @@ fun DashboardScreen(
                 }
             }
         }
+
+        // Top-center stack: TripHudChip + MediaTile (each conditional)
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 6.dp, start = 80.dp, end = 80.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            liveStats?.let { stats -> TripHudChip(stats = stats) }
+            if (mediaInfo.hasSession || mediaAccess.needsOnboarding) {
+                MediaTile()
+            }
+        }
+
+        // Top-left controls: history + sport mode
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .background(Color(0xCC000000), CircleShape)
+                    .clickable { onOpenHistory() }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "≡",
+                    color = Color(0xFF00B4D8),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .background(Color(0xCC000000), RoundedCornerShape(20.dp))
+                    .border(1.dp, Color(0xFFC8102E), RoundedCornerShape(20.dp))
+                    .clickable { onOpenSport() }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "SPORT",
+                    color = Color(0xFFC8102E),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .background(Color(0xCC000000), CircleShape)
+                    .clickable { onOpenSettings() }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "⚙",
+                    color = Color(0xFF00B4D8),
+                    fontSize = 18.sp,
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun SpeedometerPanel(
     displaySpeed: Float,
+    units: SpeedUnits,
+    skin: SpeedoSkin,
     onDemoPress: () -> Unit,
     onDemoRelease: () -> Unit,
     modifier: Modifier
@@ -198,7 +281,12 @@ private fun SpeedometerPanel(
     val currentOnDemoRelease = rememberUpdatedState(onDemoRelease)
 
     Box(modifier = modifier) {
-        SpeedometerGauge(speedKmh = displaySpeed, modifier = Modifier.fillMaxSize())
+        SpeedometerGauge(
+            speedKmh = displaySpeed,
+            units = units,
+            skin = skin,
+            modifier = Modifier.fillMaxSize(),
+        )
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)

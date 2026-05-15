@@ -3,6 +3,7 @@ package com.sportchronoclock
 import com.sportchronoclock.location.LocationData
 import com.sportchronoclock.location.LocationProvider
 import com.sportchronoclock.navigation.DirectionsService
+import com.sportchronoclock.ride.RideEventBus
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
@@ -26,14 +27,14 @@ class MainViewModelTest {
 
     @Test
     fun setPinLocationStoresCoordinates() = runTest {
-        val vm = MainViewModel(FakeLocationProvider(), fakeDirectionsService())
+        val vm = MainViewModel(FakeLocationProvider(), fakeDirectionsService(), RideEventBus())
         vm.setPinLocation(51.5074, -0.1278)
         assertEquals(51.5074 to -0.1278, vm.pinLocation.value)
     }
 
     @Test
     fun clearRouteAlsoClearsPinLocation() = runTest {
-        val vm = MainViewModel(FakeLocationProvider(), fakeDirectionsService())
+        val vm = MainViewModel(FakeLocationProvider(), fakeDirectionsService(), RideEventBus())
         vm.setPinLocation(51.5074, -0.1278)
         vm.clearRoute()
         assertNull(vm.pinLocation.value)
@@ -41,7 +42,7 @@ class MainViewModelTest {
 
     @Test
     fun routeToPinWithNoGpsFixSetsError() = runTest {
-        val vm = MainViewModel(FakeLocationProvider(), fakeDirectionsService())
+        val vm = MainViewModel(FakeLocationProvider(), fakeDirectionsService(), RideEventBus())
         // _locationData is null — no GPS fix yet
         vm.routeToPin(51.5074, -0.1278)
         assertTrue(vm.searchState.value is SearchState.Error)
