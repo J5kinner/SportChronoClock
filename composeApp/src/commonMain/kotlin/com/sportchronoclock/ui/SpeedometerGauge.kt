@@ -23,7 +23,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sportchronoclock.format.UnitFormatter
 import com.sportchronoclock.settings.SpeedUnits
-import com.sportchronoclock.settings.SpeedoSkin
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -40,27 +39,12 @@ private val BadgeBorder = Color(0xFF1a2a3a)
 private val MBlue = Color(0xFF0057B8)
 private val MViolet = Color(0xFF6B2F8A)
 private val MRed = Color(0xFFC8102E)
-private val TrackAccent = Color(0xFFC8102E)
-private val TrackDim = Color(0xFF2a0a10)
 
 @Composable
 fun SpeedometerGauge(
     speedKmh: Float,
     units: SpeedUnits = SpeedUnits.KMH,
-    skin: SpeedoSkin = SpeedoSkin.BMW_M,
     modifier: Modifier = Modifier,
-) {
-    when (skin) {
-        SpeedoSkin.BMW_M -> BmwMSkin(speedKmh = speedKmh, units = units, modifier = modifier)
-        SpeedoSkin.TRACK_BLACK -> TrackBlackSkin(speedKmh = speedKmh, units = units, modifier = modifier)
-    }
-}
-
-@Composable
-private fun BmwMSkin(
-    speedKmh: Float,
-    units: SpeedUnits,
-    modifier: Modifier,
 ) {
     val maxSpeed = UnitFormatter.maxScaleSpeed(units)
     val displayValue = UnitFormatter.displaySpeed(speedKmh, units)
@@ -213,66 +197,3 @@ private fun BmwMSkin(
     }
 }
 
-@Composable
-private fun TrackBlackSkin(
-    speedKmh: Float,
-    units: SpeedUnits,
-    modifier: Modifier,
-) {
-    val displayValue = UnitFormatter.displaySpeed(speedKmh, units)
-    val unitLabel = UnitFormatter.speedLabel(units)
-    val maxSpeed = UnitFormatter.maxScaleSpeed(units)
-    val progress = when (units) {
-        SpeedUnits.KMH -> (speedKmh / maxSpeed).coerceIn(0f, 1f)
-        SpeedUnits.MPH -> ((speedKmh * 0.6213711922f) / maxSpeed).coerceIn(0f, 1f)
-    }
-
-    Box(
-        modifier = modifier.background(Color.Black),
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val barHeight = size.height * 0.06f
-            val barTop = size.height * 0.78f
-            val barLeft = size.width * 0.10f
-            val barWidth = size.width * 0.80f
-
-            drawRoundRect(
-                color = TrackDim,
-                topLeft = Offset(barLeft, barTop),
-                size = Size(barWidth, barHeight),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(barHeight / 2f),
-            )
-            if (progress > 0f) {
-                drawRoundRect(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(TrackAccent.copy(alpha = 0.7f), TrackAccent),
-                    ),
-                    topLeft = Offset(barLeft, barTop),
-                    size = Size(barWidth * progress, barHeight),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(barHeight / 2f),
-                )
-            }
-        }
-
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                text = displayValue.toString(),
-                fontSize = 96.sp,
-                fontWeight = FontWeight.Black,
-                color = Color.White,
-                letterSpacing = (-4).sp,
-            )
-            Text(
-                text = unitLabel,
-                fontSize = 11.sp,
-                color = TrackAccent,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 6.sp,
-            )
-        }
-    }
-}

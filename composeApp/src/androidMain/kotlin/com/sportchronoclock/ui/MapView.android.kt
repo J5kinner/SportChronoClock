@@ -21,8 +21,9 @@ import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
 
-private const val STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
+private const val STYLE_URL = "https://tiles.openfreemap.org/styles/positron"
 private const val ROUTE_SOURCE = "route-source"
+private const val ROUTE_CASING_LAYER = "route-casing-layer"
 private const val ROUTE_LAYER = "route-layer"
 private const val USER_POS_SOURCE = "user-pos-source"
 private const val USER_ARROW_LAYER = "user-arrow-layer"
@@ -122,20 +123,31 @@ actual fun MapView(
         }
     }
 
-    // Draw or clear route polyline
+    // Draw or clear route polyline — two stacked layers: dark casing + cyan inner ribbon
     LaunchedEffect(routePoints) {
         mapView.getMapAsync { map ->
             map.getStyle { style ->
                 style.removeLayer(ROUTE_LAYER)
+                style.removeLayer(ROUTE_CASING_LAYER)
                 style.removeSource(ROUTE_SOURCE)
                 if (routePoints.isNotEmpty()) {
                     val coords = routePoints.joinToString(",") { (lat, lon) -> "[$lon,$lat]" }
                     val geoJson = """{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"LineString","coordinates":[$coords]},"properties":{}}]}"""
                     style.addSource(GeoJsonSource(ROUTE_SOURCE, geoJson))
+                    // Casing — dark navy outline so the route stays visible on both light + dark map styles
+                    style.addLayer(
+                        LineLayer(ROUTE_CASING_LAYER, ROUTE_SOURCE).withProperties(
+                            PropertyFactory.lineColor("#0D1B2A"),
+                            PropertyFactory.lineWidth(14f),
+                            PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                            PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
+                        )
+                    )
+                    // Inner ribbon — bright cyan
                     style.addLayer(
                         LineLayer(ROUTE_LAYER, ROUTE_SOURCE).withProperties(
-                            PropertyFactory.lineColor("#1E88E5"),
-                            PropertyFactory.lineWidth(6f),
+                            PropertyFactory.lineColor("#00B4D8"),
+                            PropertyFactory.lineWidth(10f),
                             PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
                             PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND)
                         )
@@ -186,23 +198,38 @@ private fun buildUserPosGeoJson(lat: Double, lon: Double): String =
     """{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[$lon,$lat]},"properties":{}}]}"""
 
 private fun createUserArrowBitmap(): android.graphics.Bitmap {
-    val size = 64
+    val size = 112
     val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(bitmap)
     val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
-    val path = android.graphics.Path().apply {
-        moveTo(size / 2f, 4f)
-        lineTo(size - 10f, size - 8f)
-        lineTo(size / 2f, size - 20f)
-        lineTo(10f, size - 8f)
+    val center = size / 2f
+
+    // Outer halo — soft cyan glow
+    paint.color = android.graphics.Color.parseColor("#3300B4D8")
+    paint.style = android.graphics.Paint.Style.FILL
+    canvas.drawCircle(center, center, size * 0.46f, paint)
+
+    // Solid disc
+    paint.color = android.graphics.Color.parseColor("#0D1B2A")
+    paint.style = android.graphics.Paint.Style.FILL
+    canvas.drawCircle(center, center, size * 0.34f, paint)
+
+    // Cyan ring
+    paint.color = android.graphics.Color.parseColor("#00B4D8")
+    paint.style = android.graphics.Paint.Style.STROKE
+    paint.strokeWidth = size * 0.04f
+    canvas.drawCircle(center, center, size * 0.34f, paint)
+
+    // Chevron arrow (points up = direction of travel after rotation by bearing)
+    val arrow = android.graphics.Path().apply {
+        moveTo(center, size * 0.22f)
+        lineTo(size * 0.66f, size * 0.54f)
+        lineTo(center, size * 0.46f)
+        lineTo(size * 0.34f, size * 0.54f)
         close()
     }
     paint.color = android.graphics.Color.WHITE
     paint.style = android.graphics.Paint.Style.FILL
-    canvas.drawPath(path, paint)
-    paint.color = android.graphics.Color.parseColor("#0D1B2A")
-    paint.style = android.graphics.Paint.Style.STROKE
-    paint.strokeWidth = 3f
-    canvas.drawPath(path, paint)
+    canvas.drawPath(arrow, paint)
     return bitmap
 }

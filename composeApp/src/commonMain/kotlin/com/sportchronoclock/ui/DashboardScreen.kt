@@ -6,7 +6,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import kotlin.math.round
 import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.*
@@ -18,9 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -36,10 +33,6 @@ import com.sportchronoclock.permissions.PermissionHandler
 import com.sportchronoclock.ride.RideStatsViewModel
 import com.sportchronoclock.settings.SettingsViewModel
 import com.sportchronoclock.settings.SpeedUnits
-import com.sportchronoclock.settings.SpeedoSkin
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -71,11 +64,6 @@ fun DashboardScreen(
     var hasPermission by remember { mutableStateOf(permissionHandler.hasLocationPermission()) }
     var permissionDenied by remember { mutableStateOf(false) }
 
-    // Demo state — lives here, not in the gauge
-    val demoScope = rememberCoroutineScope()
-    var demoSpeed by remember { mutableStateOf(0f) }
-    var isDemoActive by remember { mutableStateOf(false) }
-    val demoRampJob = remember { arrayOfNulls<Job>(1) }
     var autoSweepDone by remember { mutableStateOf(false) }
     val sweepAnimatable = remember { Animatable(0f) }
 
@@ -86,11 +74,7 @@ fun DashboardScreen(
         autoSweepDone = true
     }
 
-    val displaySpeed = when {
-        isDemoActive || demoSpeed > 0f -> demoSpeed
-        !autoSweepDone -> sweepAnimatable.value
-        else -> speedKmh
-    }
+    val displaySpeed = if (!autoSweepDone) sweepAnimatable.value else speedKmh
 
     KeepScreenOn()
 
@@ -115,36 +99,11 @@ fun DashboardScreen(
         BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(top = 0.dp)) {
             val isLandscape = maxWidth > maxHeight
 
-            val onDemoPress: () -> Unit = {
-                demoRampJob[0]?.cancel()
-                isDemoActive = true
-                demoSpeed = 0f
-                demoRampJob[0] = demoScope.launch {
-                    while (demoSpeed < 200f) {
-                        demoSpeed = (demoSpeed + 0.5f).coerceAtMost(200f)
-                        delay(16)
-                    }
-                }
-            }
-            val onDemoRelease: () -> Unit = {
-                demoRampJob[0]?.cancel()
-                isDemoActive = false
-                demoRampJob[0] = demoScope.launch {
-                    while (demoSpeed > 0f) {
-                        demoSpeed = (demoSpeed - 0.5f).coerceAtLeast(0f)
-                        delay(16)
-                    }
-                }
-            }
-
             if (isLandscape) {
                 Row(modifier = Modifier.fillMaxSize()) {
                     SpeedometerPanel(
                         displaySpeed = displaySpeed,
                         units = settings.speedUnits,
-                        skin = settings.speedoSkin,
-                        onDemoPress = onDemoPress,
-                        onDemoRelease = onDemoRelease,
                         modifier = Modifier.fillMaxHeight().weight(0.4f)
                     )
                     MapPanel(
@@ -168,15 +127,8 @@ fun DashboardScreen(
                     )
                 }
             } else {
+                // Portrait: map HUD on top, speedo below — matches motorbike dashboard convention
                 Column(modifier = Modifier.fillMaxSize()) {
-                    SpeedometerPanel(
-                        displaySpeed = displaySpeed,
-                        units = settings.speedUnits,
-                        skin = settings.speedoSkin,
-                        onDemoPress = onDemoPress,
-                        onDemoRelease = onDemoRelease,
-                        modifier = Modifier.fillMaxWidth().weight(0.4f)
-                    )
                     MapPanel(
                         locationData = locationData,
                         routeResult = routeResult,
@@ -195,6 +147,11 @@ fun DashboardScreen(
                         },
                         statusMessage = statusMessage,
                         modifier = Modifier.fillMaxWidth().weight(0.6f)
+                    )
+                    SpeedometerPanel(
+                        displaySpeed = displaySpeed,
+                        units = settings.speedUnits,
+                        modifier = Modifier.fillMaxWidth().weight(0.4f)
                     )
                 }
             }
@@ -272,56 +229,14 @@ fun DashboardScreen(
 private fun SpeedometerPanel(
     displaySpeed: Float,
     units: SpeedUnits,
-    skin: SpeedoSkin,
-    onDemoPress: () -> Unit,
-    onDemoRelease: () -> Unit,
     modifier: Modifier
 ) {
-    val currentOnDemoPress = rememberUpdatedState(onDemoPress)
-    val currentOnDemoRelease = rememberUpdatedState(onDemoRelease)
-
     Box(modifier = modifier) {
         SpeedometerGauge(
             speedKmh = displaySpeed,
             units = units,
-            skin = skin,
             modifier = Modifier.fillMaxSize(),
         )
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 14.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(Color(0xFF0057B8), Color(0xFF003d8a))
-                        ),
-                        shape = RoundedCornerShape(24.dp)
-                    )
-                    .border(1.dp, Color(0xFF0066cc), RoundedCornerShape(24.dp))
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onPress = {
-                                currentOnDemoPress.value()
-                                tryAwaitRelease()
-                                currentOnDemoRelease.value()
-                            }
-                        )
-                    }
-                    .padding(horizontal = 28.dp, vertical = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "HOLD TO DEMO",
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp
-                )
-            }
-        }
     }
 }
 
