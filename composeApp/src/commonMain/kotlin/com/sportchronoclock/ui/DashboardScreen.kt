@@ -316,9 +316,7 @@ private fun MapPanel(
             }
         }
     } else {
-        Box(modifier = modifier.background(Color(0xFF111111)), contentAlignment = Alignment.Center) {
-            Text(text = statusMessage, color = Color.White, fontSize = 16.sp)
-        }
+        BouncingBikeLoader(caption = statusMessage, modifier = modifier)
     }
 }
 

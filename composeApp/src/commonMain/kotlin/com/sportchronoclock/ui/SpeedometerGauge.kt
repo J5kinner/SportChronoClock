@@ -55,15 +55,24 @@ fun SpeedometerGauge(
     val progress = (displayValueFloat / maxSpeed).coerceIn(0f, 1f)
     val labels = UnitFormatter.majorTickLabels(units)
     val unitLabel = UnitFormatter.speedLabel(units)
+    // Drop the font size when the number hits 3 digits so it stops touching the arc sweep.
+    val speedFontSize = if (displayValue >= 100) 96.sp else 120.sp
     val startAngle = 150f
     val totalSweep = 240f
     val textMeasurer = rememberTextMeasurer()
 
-    Box(
-        modifier = modifier.background(Color.Black),
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = modifier.background(Color.Black)) {
+        // Lock the gauge area to a square sized by the panel's smaller side, anchored to the
+        // bottom. The empty room migrates to the top of the panel (next to the map), so the
+        // dash visibly sits at the bottom with no black bar below it.
+        val gaugeSide = if (maxWidth < maxHeight) maxWidth else maxHeight
+        Box(
+            modifier = Modifier
+                .size(gaugeSide)
+                .align(Alignment.BottomCenter),
+            contentAlignment = Alignment.Center,
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
             val strokeWidth = size.minDimension * 0.07f
             val inset = strokeWidth / 2f + size.minDimension * 0.12f
             val arcSize = Size(size.minDimension - inset * 2, size.minDimension - inset * 2)
@@ -160,15 +169,15 @@ fun SpeedometerGauge(
         ) {
             Text(
                 text = displayValue.toString(),
-                fontSize = 52.sp,
-                fontWeight = FontWeight.Light,
+                fontSize = speedFontSize,
+                fontWeight = FontWeight.Medium,
                 color = SpeedTextColor,
             )
             Text(
                 text = unitLabel,
-                fontSize = 10.sp,
+                fontSize = 14.sp,
                 color = UnitTextColor,
-                letterSpacing = 4.sp,
+                letterSpacing = 5.sp,
             )
             Spacer(Modifier.height(8.dp))
             Box(
@@ -193,6 +202,7 @@ fun SpeedometerGauge(
                     }
                 }
             }
+        }
         }
     }
 }
